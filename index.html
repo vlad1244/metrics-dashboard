@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Analytics Pro</title>
+  <title>Analytics Pro v2</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -12,9 +12,9 @@
     .card{background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); border: 1px solid rgba(0,0,0,0.03);}
     #mainContent.blur-mode { filter: blur(20px); pointer-events: none; }
     .kpi-icon { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; }
-    /* Стилизация скроллбара */
     #cityList::-webkit-scrollbar { width: 4px; }
     #cityList::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+    .table-wrap{overflow:auto}
   </style>
 </head>
 <body>
@@ -27,10 +27,9 @@
       </svg>
     </div>
     <h2 class="text-2xl font-black text-slate-800 mb-2">Metrics Access</h2>
-    <p class="text-slate-400 mb-8 text-sm px-4">Введите персональный цифровой ключ доступа</p>
-    <input type="text" id="passInput" maxlength="4" placeholder="0000" class="w-full text-center text-4xl tracking-[0.3em] font-black py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-blue-500 focus:bg-white outline-none transition-all mb-4 text-slate-700">
+    <input type="text" id="passInput" maxlength="4" placeholder="0000" class="w-full text-center text-4xl tracking-[0.3em] font-black py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-blue-500 outline-none mb-4 mt-4">
     <div id="loginError" class="text-red-500 text-xs font-bold mb-4 opacity-0 transition-opacity">НЕВЕРНЫЙ КОД</div>
-    <button id="loginBtn" class="w-full bg-slate-900 text-white font-bold py-5 rounded-2xl hover:bg-blue-600 transition-all active:scale-95 shadow-lg">АВТОРИЗОВАТЬСЯ</button>
+    <button id="loginBtn" class="w-full bg-slate-900 text-white font-bold py-5 rounded-2xl hover:bg-blue-600 transition-all shadow-lg">ВОЙТИ</button>
   </div>
 </div>
 
@@ -41,64 +40,54 @@
           <div class="card p-6">
             <div class="flex items-center justify-between mb-6">
                 <span class="text-[10px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-2 py-1 rounded">Настройки</span>
-                <button id="logoutBtn" class="text-slate-400 hover:text-red-500 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd" />
-                    </svg>
-                </button>
+                <button id="logoutBtn" class="text-slate-400 hover:text-red-500 transition-colors">Выйти</button>
             </div>
             
             <label class="block text-xs font-bold text-slate-400 uppercase mb-3">Выберите город:</label>
-            <div id="cityList" class="space-y-1 max-h-[400px] overflow-auto mb-6 pr-2"></div>
+            <div id="cityList" class="space-y-1 max-h-[350px] overflow-auto mb-6 pr-2 border-b pb-4"></div>
             
-            <label class="block text-xs font-bold text-slate-400 uppercase mb-3">Период:</label>
-            <select id="monthSelect" class="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none ring-2 ring-transparent focus:ring-blue-500/20"></select>
+            <label class="block text-xs font-bold text-slate-400 uppercase mb-3">Выберите период:</label>
+            <select id="monthSelect" class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 transition-all"></select>
             
-            <button id="apply" class="w-full mt-6 bg-blue-600 text-white font-bold py-4 rounded-xl shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all">ОБНОВИТЬ ДАННЫЕ</button>
+            <button id="apply" class="w-full mt-6 bg-blue-600 text-white font-bold py-4 rounded-xl shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95">ПРИМЕНИТЬ</button>
           </div>
         </aside>
 
         <main class="col-span-12 lg:col-span-9 space-y-6">
           <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="card p-5">
-                <div class="kpi-icon bg-blue-50 text-blue-600 mb-4"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg></div>
                 <div class="text-2xl font-black text-slate-800" id="kpiLeads">0</div>
                 <div class="text-[10px] font-bold text-slate-400 uppercase mt-1">Лиды</div>
             </div>
             <div class="card p-5">
-                <div class="kpi-icon bg-emerald-50 text-emerald-600 mb-4"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg></div>
                 <div class="text-2xl font-black text-slate-800" id="kpiCtr">0%</div>
-                <div class="text-[10px] font-bold text-slate-400 uppercase mt-1">CTR Средний</div>
+                <div class="text-[10px] font-bold text-slate-400 uppercase mt-1">CTR</div>
             </div>
             <div class="card p-5">
-                <div class="kpi-icon bg-orange-50 text-orange-600 mb-4"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
                 <div class="text-2xl font-black text-slate-800" id="kpiCpl">$0</div>
-                <div class="text-[10px] font-bold text-slate-400 uppercase mt-1">CPL (Цена)</div>
+                <div class="text-[10px] font-bold text-slate-400 uppercase mt-1">CPL</div>
             </div>
             <div class="card p-5">
-                <div class="kpi-icon bg-violet-50 text-violet-600 mb-4"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg></div>
                 <div class="text-2xl font-black text-slate-800" id="kpiSpend">$0</div>
-                <div class="text-[10px] font-bold text-slate-400 uppercase mt-1">Общий бюджет</div>
+                <div class="text-[10px] font-bold text-slate-400 uppercase mt-1">Бюджет</div>
             </div>
           </section>
 
           <div class="card p-8">
-              <div class="flex items-center justify-between mb-8">
-                  <h3 class="font-black text-slate-800 uppercase tracking-tighter text-lg">Динамика по дням: <span id="cityName" class="text-blue-600 ml-2">—</span></h3>
-              </div>
+              <h3 class="font-black text-slate-800 uppercase tracking-tighter text-lg mb-6">Динамика: <span id="cityName" class="text-blue-600">—</span></h3>
               <canvas id="lineChart" height="120"></canvas>
           </div>
 
-          <div class="card overflow-hidden border-none shadow-sm">
+          <div class="card overflow-hidden">
             <div class="table-wrap">
-              <table class="min-w-full text-sm">
+              <table class="min-w-full text-sm text-left">
                 <thead class="bg-slate-900 text-slate-400 font-bold uppercase text-[10px]">
                   <tr>
-                    <th class="text-left px-8 py-5">Дата</th>
-                    <th class="text-left px-8 py-5">Лиды</th>
-                    <th class="text-left px-8 py-5">CPL</th>
-                    <th class="text-left px-8 py-5">Бюджет</th>
-                    <th class="text-left px-8 py-5">CTR</th>
+                    <th class="px-8 py-5">Дата</th>
+                    <th class="px-8 py-5">Лиды</th>
+                    <th class="px-8 py-5">CPL</th>
+                    <th class="px-8 py-5">Бюджет</th>
+                    <th class="px-8 py-5">CTR</th>
                   </tr>
                 </thead>
                 <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
@@ -111,8 +100,7 @@
 
 <script>
 (function(){
-    // ПАРОЛИ КЛИЕНТОВ + ВАШ МАСТЕР-КОД
-    const MASTER_CODE = "7007"; // Введите его, чтобы видеть ВСЕ
+    const MASTER_CODE = "7007";
     const ACCESS_MAP = {
         "4912": ["Астана", "Шымкент/1", "Алматы", "Талдыкорган", "Туркестан"],
         "8235": ["Актобе", "Бишкек", "Ош"],
@@ -130,8 +118,8 @@
     let allData = [];
     let isMaster = false;
     let allowedCities = [];
-    let currentCity = null;
     let chart = null;
+    let cachedMonthsByCity = {}; // Хранилище сгруппированных данных
 
     const money = n => '$' + (n || 0).toFixed(2);
     const parseNum = v => {
@@ -140,21 +128,13 @@
         return parseFloat(s) || 0;
     };
 
-    // ВХОД
     document.getElementById('loginBtn').onclick = function() {
         const pass = document.getElementById('passInput').value;
-        const err = document.getElementById('loginError');
-
-        if (pass === MASTER_CODE) {
-            isMaster = true;
-            enter();
-        } else if (ACCESS_MAP[pass]) {
-            isMaster = false;
-            allowedCities = ACCESS_MAP[pass];
-            enter();
-        } else {
-            err.style.opacity = '1';
-            setTimeout(() => err.style.opacity = '0', 2000);
+        if (pass === MASTER_CODE) { isMaster = true; enter(); }
+        else if (ACCESS_MAP[pass]) { isMaster = false; allowedCities = ACCESS_MAP[pass]; enter(); }
+        else { 
+            document.getElementById('loginError').style.opacity = '1';
+            setTimeout(() => document.getElementById('loginError').style.opacity = '0', 2000);
         }
     };
 
@@ -170,67 +150,85 @@
         try {
             const res = await fetch('https://metrics-api-rwm4brhysa-uc.a.run.app/metrics');
             const data = await res.json();
-            
-            // Если вы мастер - берем всё. Если нет - фильтруем.
             allData = isMaster ? data : data.filter(item => allowedCities.includes(item.city));
 
+            // Предварительная группировка всех данных по месяцам
+            allData.forEach(cityObj => {
+                const months = {};
+                cityObj.data.slice(1).forEach(row => {
+                    if(!row[0]) return;
+                    const mKey = row[0].substring(0, 7);
+                    (months[mKey] ||= []).push(row);
+                });
+                cachedMonthsByCity[cityObj.city] = months;
+            });
+
             renderCityList();
-            if(allData.length > 0) updateCity(allData[0].city);
-        } catch (e) {
-            alert("Ошибка связи с сервером");
-        }
+            if(allData.length > 0) {
+                // Изначально показываем первый город и его последний месяц
+                updateUIAfterSelection(allData[0].city);
+            }
+        } catch (e) { alert("Ошибка загрузки данных"); }
     }
 
     function renderCityList() {
         const container = document.getElementById('cityList');
         container.innerHTML = allData.map((item, idx) => `
             <label class="flex items-center gap-3 p-3 rounded-xl hover:bg-blue-50 cursor-pointer transition-all">
-                <input type="radio" name="city" value="${item.city}" ${idx===0?'checked':''} class="w-4 h-4 accent-blue-600">
+                <input type="radio" name="city" value="${item.city}" ${idx===0?'checked':''} onchange="updateMonthDropdown(this.value)">
                 <span class="text-sm font-bold text-slate-600">${item.city}</span>
             </label>
         `).join('');
+        
+        // Сразу заполняем выпадающий список месяцев для первого города
+        if(allData[0]) updateMonthDropdown(allData[0].city);
     }
 
-    function updateCity(cityName) {
-        currentCity = cityName;
-        document.getElementById('cityName').textContent = cityName;
-        const cityObj = allData.find(x => x.city === cityName);
-        
-        const months = {};
-        cityObj.data.slice(1).forEach(row => {
-            if(!row[0]) return;
-            const month = row[0].substring(0, 7);
-            if(!months[month]) months[month] = [];
-            months[month].push(row);
-        });
-
+    // Обновляет только список месяцев в селекторе при смене города в радиокнопках
+    window.updateMonthDropdown = function(cityName) {
         const mSelect = document.getElementById('monthSelect');
+        const months = cachedMonthsByCity[cityName] || {};
         const mKeys = Object.keys(months).sort().reverse();
         mSelect.innerHTML = mKeys.map(m => `<option value="${m}">${m}</option>`).join('');
-        
-        renderData(months[mKeys[0]]);
+    };
+
+    // Главная функция отрисовки при нажатии кнопки ПРИМЕНИТЬ
+    document.getElementById('apply').onclick = () => {
+        const city = document.querySelector('input[name="city"]:checked').value;
+        const month = document.getElementById('monthSelect').value;
+        renderDashboard(city, month);
+    };
+
+    // Начальная отрисовка
+    function updateUIAfterSelection(cityName) {
+        updateMonthDropdown(cityName);
+        const firstMonth = document.getElementById('monthSelect').value;
+        renderDashboard(cityName, firstMonth);
     }
 
-    function renderData(rows) {
+    function renderDashboard(cityName, monthKey) {
+        document.getElementById('cityName').textContent = cityName;
+        const rows = (cachedMonthsByCity[cityName] || {})[monthKey] || [];
+        
         const tbody = document.getElementById('tableBody');
         let totalLeads = 0, totalSpend = 0, totalImpr = 0, totalClicks = 0, cplSum = 0;
 
         tbody.innerHTML = rows.map(r => {
             const l = parseNum(r[1]), cpl = parseNum(r[2]), sp = parseNum(r[3]), im = parseNum(r[4]), cl = parseNum(r[5]), ct = r[6];
             totalLeads += l; totalSpend += sp; totalImpr += im; totalClicks += cl; cplSum += cpl;
-            return `<tr class="hover:bg-slate-50 transition-colors">
+            return `<tr class="hover:bg-slate-50">
                 <td class="px-8 py-4 font-bold text-slate-500">${r[0]}</td>
                 <td class="px-8 py-4 font-black text-slate-800">${l}</td>
                 <td class="px-8 py-4 text-slate-500">${money(cpl)}</td>
                 <td class="px-8 py-4 text-slate-500">${money(sp)}</td>
-                <td class="px-8 py-4 font-bold text-blue-600 bg-blue-50/30">${ct}</td>
+                <td class="px-8 py-4 font-bold text-blue-600">${ct}</td>
             </tr>`;
         }).join('');
 
         document.getElementById('kpiLeads').textContent = totalLeads;
         document.getElementById('kpiSpend').textContent = money(totalSpend);
-        document.getElementById('kpiCpl').textContent = money(cplSum / rows.length);
-        document.getElementById('kpiCtr').textContent = (totalClicks/totalImpr*100).toFixed(2) + '%';
+        document.getElementById('kpiCpl').textContent = money(rows.length ? cplSum / rows.length : 0);
+        document.getElementById('kpiCtr').textContent = totalImpr ? (totalClicks/totalImpr*100).toFixed(2) + '%' : '0%';
 
         renderChart(rows);
     }
@@ -246,29 +244,12 @@
                     label: 'Лиды', 
                     data: rows.map(r => parseNum(r[1])), 
                     borderColor: '#2563eb', 
-                    borderWidth: 4,
-                    pointBackgroundColor: '#fff',
-                    pointBorderWidth: 2,
-                    pointRadius: 4,
-                    tension: 0.4, 
-                    fill: true, 
-                    backgroundColor: 'rgba(37,99,235,0.05)' 
+                    borderWidth: 4, tension: 0.4, fill: true, backgroundColor: 'rgba(37,99,235,0.05)', pointRadius: 4
                 }]
             },
-            options: { 
-                plugins: { legend: { display: false } }, 
-                scales: { 
-                    y: { beginAtZero: true, grid: { display: false } },
-                    x: { grid: { display: false } }
-                } 
-            }
+            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
         });
     }
-
-    document.getElementById('apply').onclick = () => {
-        const selectedCity = document.querySelector('input[name="city"]:checked').value;
-        updateCity(selectedCity);
-    };
 
 })();
 </script>
