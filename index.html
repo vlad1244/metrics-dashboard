@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Analytics Pro v2</title>
+  <title>Analytics Pro Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -11,42 +11,42 @@
     body{background:#f8fafc; min-height:100vh; font-family: system-ui, -apple-system, sans-serif;}
     .card{background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); border: 1px solid rgba(0,0,0,0.03);}
     #mainContent.blur-mode { filter: blur(20px); pointer-events: none; }
-    .kpi-icon { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; }
     #cityList::-webkit-scrollbar { width: 4px; }
     #cityList::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
     .table-wrap{overflow:auto}
+    th { white-space: nowrap; }
   </style>
 </head>
 <body>
 
 <div id="loginScreen" class="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900">
   <div class="bg-white p-10 rounded-[32px] shadow-2xl max-w-sm w-full text-center mx-4">
-    <div class="mb-6 inline-flex items-center justify-center w-20 h-20 bg-blue-600 text-white rounded-3xl rotate-3 shadow-xl shadow-blue-500/30">
+    <div class="mb-6 inline-flex items-center justify-center w-20 h-20 bg-blue-600 text-white rounded-3xl rotate-3 shadow-xl">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
       </svg>
     </div>
     <h2 class="text-2xl font-black text-slate-800 mb-2">Metrics Access</h2>
-    <input type="text" id="passInput" maxlength="4" placeholder="0000" class="w-full text-center text-4xl tracking-[0.3em] font-black py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-blue-500 outline-none mb-4 mt-4">
+    <input type="text" id="passInput" maxlength="4" placeholder="0000" class="w-full text-center text-4xl tracking-[0.3em] font-black py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-blue-500 outline-none mb-4 mt-4 text-slate-700">
     <div id="loginError" class="text-red-500 text-xs font-bold mb-4 opacity-0 transition-opacity">НЕВЕРНЫЙ КОД</div>
-    <button id="loginBtn" class="w-full bg-slate-900 text-white font-bold py-5 rounded-2xl hover:bg-blue-600 transition-all shadow-lg">ВОЙТИ</button>
+    <button id="loginBtn" class="w-full bg-slate-900 text-white font-bold py-5 rounded-2xl hover:bg-blue-600 transition-all shadow-lg active:scale-95">ВОЙТИ</button>
   </div>
 </div>
 
 <div id="app" class="min-h-screen">
-    <div id="mainContent" class="blur-mode mx-auto max-w-[1340px] px-4 py-8 grid grid-cols-12 gap-6">
+    <div id="mainContent" class="blur-mode mx-auto max-w-[1400px] px-4 py-8 grid grid-cols-12 gap-6">
         
         <aside class="col-span-12 lg:col-span-3 space-y-6">
           <div class="card p-6">
-            <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center justify-between mb-6 border-b pb-4">
                 <span class="text-[10px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-2 py-1 rounded">Настройки</span>
-                <button id="logoutBtn" class="text-slate-400 hover:text-red-500 transition-colors">Выйти</button>
+                <button id="logoutBtn" class="text-xs font-bold text-slate-400 hover:text-red-500 transition-colors uppercase">Выйти</button>
             </div>
             
-            <label class="block text-xs font-bold text-slate-400 uppercase mb-3">Выберите город:</label>
+            <label class="block text-xs font-bold text-slate-400 uppercase mb-3">Город:</label>
             <div id="cityList" class="space-y-1 max-h-[350px] overflow-auto mb-6 pr-2 border-b pb-4"></div>
             
-            <label class="block text-xs font-bold text-slate-400 uppercase mb-3">Выберите период:</label>
+            <label class="block text-xs font-bold text-slate-400 uppercase mb-3">Месяц:</label>
             <select id="monthSelect" class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 transition-all"></select>
             
             <button id="apply" class="w-full mt-6 bg-blue-600 text-white font-bold py-4 rounded-xl shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95">ПРИМЕНИТЬ</button>
@@ -55,26 +55,29 @@
 
         <main class="col-span-12 lg:col-span-9 space-y-6">
           <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div class="card p-5">
+            <div class="card p-5 border-b-4 border-blue-500">
                 <div class="text-2xl font-black text-slate-800" id="kpiLeads">0</div>
-                <div class="text-[10px] font-bold text-slate-400 uppercase mt-1">Лиды</div>
+                <div class="text-[10px] font-bold text-slate-400 uppercase mt-1 tracking-wider">Всего Лидов</div>
             </div>
-            <div class="card p-5">
+            <div class="card p-5 border-b-4 border-emerald-500">
                 <div class="text-2xl font-black text-slate-800" id="kpiCtr">0%</div>
-                <div class="text-[10px] font-bold text-slate-400 uppercase mt-1">CTR</div>
+                <div class="text-[10px] font-bold text-slate-400 uppercase mt-1 tracking-wider">Средний CTR</div>
             </div>
-            <div class="card p-5">
+            <div class="card p-5 border-b-4 border-orange-500">
                 <div class="text-2xl font-black text-slate-800" id="kpiCpl">$0</div>
-                <div class="text-[10px] font-bold text-slate-400 uppercase mt-1">CPL</div>
+                <div class="text-[10px] font-bold text-slate-400 uppercase mt-1 tracking-wider">Ср. Цена Лида</div>
             </div>
-            <div class="card p-5">
+            <div class="card p-5 border-b-4 border-violet-500">
                 <div class="text-2xl font-black text-slate-800" id="kpiSpend">$0</div>
-                <div class="text-[10px] font-bold text-slate-400 uppercase mt-1">Бюджет</div>
+                <div class="text-[10px] font-bold text-slate-400 uppercase mt-1 tracking-wider">Общий Бюджет</div>
             </div>
           </section>
 
           <div class="card p-8">
-              <h3 class="font-black text-slate-800 uppercase tracking-tighter text-lg mb-6">Динамика: <span id="cityName" class="text-blue-600">—</span></h3>
+              <h3 class="font-black text-slate-800 uppercase tracking-tighter text-lg mb-6 flex items-center">
+                <span class="w-2 h-6 bg-blue-600 mr-3 rounded-full"></span>
+                Динамика лидов: <span id="cityName" class="text-blue-600 ml-2">—</span>
+              </h3>
               <canvas id="lineChart" height="120"></canvas>
           </div>
 
@@ -83,14 +86,27 @@
               <table class="min-w-full text-sm text-left">
                 <thead class="bg-slate-900 text-slate-400 font-bold uppercase text-[10px]">
                   <tr>
-                    <th class="px-8 py-5">Дата</th>
-                    <th class="px-8 py-5">Лиды</th>
-                    <th class="px-8 py-5">CPL</th>
-                    <th class="px-8 py-5">Бюджет</th>
-                    <th class="px-8 py-5">CTR</th>
+                    <th class="px-6 py-5">Дата</th>
+                    <th class="px-6 py-5 text-white">Лиды</th>
+                    <th class="px-6 py-5">CPL</th>
+                    <th class="px-6 py-5 text-white">Бюджет</th>
+                    <th class="px-6 py-5">Показы</th>
+                    <th class="px-6 py-5">Клики</th>
+                    <th class="px-6 py-5">CTR</th>
                   </tr>
                 </thead>
                 <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+                <tfoot class="bg-blue-600 text-white font-bold">
+                  <tr>
+                    <td class="px-6 py-4 uppercase text-[10px] tracking-widest">ИТОГО ЗА МЕСЯЦ</td>
+                    <td id="tLeads" class="px-6 py-4 text-lg">—</td>
+                    <td id="tCpl" class="px-6 py-4">—</td>
+                    <td id="tSpend" class="px-6 py-4 text-lg">—</td>
+                    <td id="tImpr" class="px-6 py-4">—</td>
+                    <td id="tClicks" class="px-6 py-4">—</td>
+                    <td id="tCtr" class="px-6 py-4">—</td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>
@@ -119,13 +135,17 @@
     let isMaster = false;
     let allowedCities = [];
     let chart = null;
-    let cachedMonthsByCity = {}; // Хранилище сгруппированных данных
+    let cachedMonthsByCity = {};
 
-    const money = n => '$' + (n || 0).toFixed(2);
+    const money = n => '$' + (n || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    const num = n => (n || 0).toLocaleString('ru-RU');
+    const pct = n => (n || 0).toFixed(2) + '%';
+
     const parseNum = v => {
         if (!v) return 0;
         let s = String(v).replace(/[^\d,.-]/g, '').replace(',', '.');
-        return parseFloat(s) || 0;
+        let f = parseFloat(s);
+        return isNaN(f) ? 0 : f;
     };
 
     document.getElementById('loginBtn').onclick = function() {
@@ -152,7 +172,6 @@
             const data = await res.json();
             allData = isMaster ? data : data.filter(item => allowedCities.includes(item.city));
 
-            // Предварительная группировка всех данных по месяцам
             allData.forEach(cityObj => {
                 const months = {};
                 cityObj.data.slice(1).forEach(row => {
@@ -165,7 +184,6 @@
 
             renderCityList();
             if(allData.length > 0) {
-                // Изначально показываем первый город и его последний месяц
                 updateUIAfterSelection(allData[0].city);
             }
         } catch (e) { alert("Ошибка загрузки данных"); }
@@ -179,27 +197,25 @@
                 <span class="text-sm font-bold text-slate-600">${item.city}</span>
             </label>
         `).join('');
-        
-        // Сразу заполняем выпадающий список месяцев для первого города
         if(allData[0]) updateMonthDropdown(allData[0].city);
     }
 
-    // Обновляет только список месяцев в селекторе при смене города в радиокнопках
     window.updateMonthDropdown = function(cityName) {
         const mSelect = document.getElementById('monthSelect');
         const months = cachedMonthsByCity[cityName] || {};
         const mKeys = Object.keys(months).sort().reverse();
-        mSelect.innerHTML = mKeys.map(m => `<option value="${m}">${m}</option>`).join('');
+        mSelect.innerHTML = mKeys.map(k => {
+           const label = new Date(k + "-01").toLocaleString('ru-RU', {month:'long', year:'numeric'}).replace(' г.','');
+           return `<option value="${k}">${label}</option>`;
+        }).join('');
     };
 
-    // Главная функция отрисовки при нажатии кнопки ПРИМЕНИТЬ
     document.getElementById('apply').onclick = () => {
         const city = document.querySelector('input[name="city"]:checked').value;
         const month = document.getElementById('monthSelect').value;
         renderDashboard(city, month);
     };
 
-    // Начальная отрисовка
     function updateUIAfterSelection(cityName) {
         updateMonthDropdown(cityName);
         const firstMonth = document.getElementById('monthSelect').value;
@@ -211,24 +227,39 @@
         const rows = (cachedMonthsByCity[cityName] || {})[monthKey] || [];
         
         const tbody = document.getElementById('tableBody');
-        let totalLeads = 0, totalSpend = 0, totalImpr = 0, totalClicks = 0, cplSum = 0;
+        let tL = 0, tS = 0, tI = 0, tC = 0;
 
         tbody.innerHTML = rows.map(r => {
-            const l = parseNum(r[1]), cpl = parseNum(r[2]), sp = parseNum(r[3]), im = parseNum(r[4]), cl = parseNum(r[5]), ct = r[6];
-            totalLeads += l; totalSpend += sp; totalImpr += im; totalClicks += cl; cplSum += cpl;
-            return `<tr class="hover:bg-slate-50">
-                <td class="px-8 py-4 font-bold text-slate-500">${r[0]}</td>
-                <td class="px-8 py-4 font-black text-slate-800">${l}</td>
-                <td class="px-8 py-4 text-slate-500">${money(cpl)}</td>
-                <td class="px-8 py-4 text-slate-500">${money(sp)}</td>
-                <td class="px-8 py-4 font-bold text-blue-600">${ct}</td>
+            const l = parseNum(r[1]), cpl = parseNum(r[2]), sp = parseNum(r[3]), im = parseNum(r[4]), cl = parseNum(r[5]), ct = parseNum(r[6]);
+            tL += l; tS += sp; tI += im; tC += cl;
+            return `<tr class="hover:bg-slate-50 transition-colors">
+                <td class="px-6 py-4 font-bold text-slate-500">${r[0]}</td>
+                <td class="px-6 py-4 font-black text-slate-800">${num(l)}</td>
+                <td class="px-6 py-4 text-slate-500">${money(cpl)}</td>
+                <td class="px-6 py-4 text-slate-500">${money(sp)}</td>
+                <td class="px-6 py-4 text-slate-400">${num(im)}</td>
+                <td class="px-6 py-4 text-slate-400">${num(cl)}</td>
+                <td class="px-6 py-4 font-bold text-blue-600">${pct(ct)}</td>
             </tr>`;
         }).join('');
 
-        document.getElementById('kpiLeads').textContent = totalLeads;
-        document.getElementById('kpiSpend').textContent = money(totalSpend);
-        document.getElementById('kpiCpl').textContent = money(rows.length ? cplSum / rows.length : 0);
-        document.getElementById('kpiCtr').textContent = totalImpr ? (totalClicks/totalImpr*100).toFixed(2) + '%' : '0%';
+        // Расчет итогов
+        const avgCtr = tI > 0 ? (tC / tI) * 100 : 0;
+        const avgCpl = tL > 0 ? (tS / tL) : 0;
+
+        // KPI блоки
+        document.getElementById('kpiLeads').textContent = num(tL);
+        document.getElementById('kpiSpend').textContent = money(tS);
+        document.getElementById('kpiCpl').textContent = money(avgCpl);
+        document.getElementById('kpiCtr').textContent = pct(avgCtr);
+
+        // Футер таблицы
+        document.getElementById('tLeads').textContent = num(tL);
+        document.getElementById('tSpend').textContent = money(tS);
+        document.getElementById('tImpr').textContent = num(tI);
+        document.getElementById('tClicks').textContent = num(tC);
+        document.getElementById('tCtr').textContent = pct(avgCtr);
+        document.getElementById('tCpl').textContent = money(avgCpl);
 
         renderChart(rows);
     }
@@ -244,10 +275,17 @@
                     label: 'Лиды', 
                     data: rows.map(r => parseNum(r[1])), 
                     borderColor: '#2563eb', 
-                    borderWidth: 4, tension: 0.4, fill: true, backgroundColor: 'rgba(37,99,235,0.05)', pointRadius: 4
+                    borderWidth: 4, tension: 0.4, fill: true, 
+                    backgroundColor: 'rgba(37,99,235,0.05)', pointRadius: 4, pointHoverRadius: 6
                 }]
             },
-            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            options: { 
+                plugins: { legend: { display: false } }, 
+                scales: { 
+                    y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                    x: { grid: { display: false } }
+                } 
+            }
         });
     }
 
