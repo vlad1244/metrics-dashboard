@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Metrics Dashboard</title>
+
+  <!-- Tailwind и Chart.js -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root{
+      --card:#fff;--muted:#6b7280;--bg:#f5f7fb;
+      --radius:18px;--shadow:0 6px 24px rgba(15,23,42,.06);
+    }
+    body{background:radial-gradient(1200px 800px at 20% -10%,#f9fbff,#eef2f8 40%,#e9edf5);}
+    .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);}
+    .ring-on:hover{box-shadow:0 0 0 6px rgba(37,99,235,.10),var(--shadow);}
+    .kpi-circle{width:92px;height:92px;border-radius:9999px;position:relative;display:grid;place-items:center}
+    .table-wrap{overflow:auto}
+    .btn{display:inline-flex;align-items:center;gap:.5rem}
+  </style>
+</head>
+
+<body>
+  <div id="app" class="min-h-screen text-slate-800"></div>
+
+  <script>
+  (function(){
+
+    // ---------- Helpers ----------
+    const money = n => '$' + (Math.round((n||0)*100)/100).toFixed(2);
+    const pct   = n => (Math.round((n||0)*10)/10).toFixed(1) + '%';
+    const num   = n => (n||0).toLocaleString('ru-RU');
+
+    const parseNum = v => {
+      if (typeof v === 'number') return v;
+      if (!v) return 0;
+      const s = String(v).replace(/\$/g,'').replace(/,/,'.').replace(/\s/g,'').replace('%','');
+      const f = parseFloat(s);
+      return isNaN(f) ? 0 : f;
+    };
+
+    const byDateAsc = (a,b)=> a.date.localeCompare(b.date);
+    const byMonthDesc = (a,b)=> b.localeCompare(a); // 'YYYY-MM'
+
+    // ---------- State ----------
+    let allData = [];
+    let currentCity = null;
+    let currentMonthKey = null;
+    let chart;
+
+    // ---------- API ----------
+    async function fetchAll() {
+      const res = await fetch('https://metrics-api-rwm4brhysa-uc.a.run.app/metrics');
+      if (!res.ok) throw new Error('API error');
+      return res.json();
+    }
+
+    // ---------- Transform ----------
+    function groupByMonth(cityObj){
+      const rows = (cityObj?.data || []).slice(1); // skip headers
+      const months = {};
+      for (const r of rows){
+        const date = r[0]; if(!date) continue;
+        const [y,m] = date.split('-');
+        const key = `${y}-${m}`;
+        (months[key] ||= []).push({
+          date,
+          leads: parseNum(r[1]),
+          cpl:   parseNum((r[2]||'').toString()),
+          spend: parseNum((r[3]||'').toString()),
+          impr:  parseNum(r[4]),
+          clicks:parseNum(r[5]),
+          ctr:   parseNum((r[6]||'').toString())
+        });
+      }
+      for (const k in months) months[k].sort(byDateAsc);
+      return months;
+    }
+
+    function calcTotals(rows){
+      const sum = rows.reduce((a,b)=>({
+        leads:a.leads+b.leads,
+        spend:a.spend+b.spend,
+        impr:a.impr+b.impr,
+        clicks:a.clicks+b.clicks,
+        cplSum:a.cplSum+b.cpl,
+        ctrSum:a.ctrSum+b.ctr
+      }), {leads:0,spend:0,impr:0,clicks:0,cplSum:0,ctrSum:0});
+
+      const avgCtr = rows.length? sum.ctrSum/rows.length : 0;
+      const avgCpl = rows.length? sum.cplSum/rows.length : 0;
+      return {...sum, avgCtr, avgCpl};
+    }
+
+    // ---------- UI Root ----------
+    const app = document.getElementById('app');
+
+    app.innerHTML = `
+      <div class="mx-auto max-w-[1180px] xl:max-w-[1280px] px-4 py-6 md:py-10 grid grid-cols-12 gap-6">
+        <!-- Sidebar -->
+        <aside class="col-span-12 md:col-span-3 space-y-4">
+          <div class="card p-4 md:p-5">
+            <div class="text-sm font-semibold text-slate-600 mb-2">Период</div>
+            <select id="monthSelect" class="w-full card px-3 py-2"></select>
+          </div>
+          <div class="card p-4 md:p-5">
+            <div class="text-sm font-semibold text-slate-600 mb-2">Город</div>
+            <div id="cityList" class="space-y-2 max-h-[340px] overflow-auto pr-1"></div>
+          </div>
+          <button id="apply" class="w-full btn justify-center bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-blue-600/10 transition">Применить</button>
+          <button id="refresh" class="w-full btn justify-center bg-white hover:bg-slate-50 text-slate-700 font-semibold py-3 rounded-xl shadow border border-slate-200"> Обновить данные</button>
+        </aside>
+
+        <!-- Main -->
+        <main class="col-span-12 md:col-span-9 space-y-6">
+          <!-- KPI -->
+          <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            ${kpiCard('Лидов','kpiLeads','blue')}
+            ${kpiCard('CTR','kpiCtr','emerald')}
+            ${kpiCard('CPL','kpiCpl','orange')}
+            ${kpiCard('Бюджет','kpiSpend','violet')}
+          </section>
+
+          <!-- Chart + stats -->
+          <section class="grid grid-cols-12 gap-4">
+            <div class="card col-span-12 md:col-span-8 p-4 md:p-6">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="font-semibold text-slate-700">Динамика лидов</h3>
+                <div class="text-xs text-slate-500" id="chartMeta">—</div>
+              </div>
+              <canvas id="lineChart" height="140"></canvas>
+            </div>
+            <div class="col-span-12 md:col-span-4 grid gap-4">
+              <div class="card p-4"><div class="text-slate-500 text-sm">Всего показов</div><div id="sumImpr" class="text-2xl font-extrabold mt-1">—</div></div>
+              <div class="card p-4"><div class="text-slate-500 text-sm">Всего кликов</div><div id="sumClicks" class="text-2xl font-extrabold mt-1">—</div></div>
+              <div class="card p-4"><div class="text-slate-500 text-sm">Выбранный город</div><div id="cityName" class="text-2xl font-extrabold mt-1">—</div></div>
+            </div>
+          </section>
+
+          <!-- Table -->
+          <section class="card p-0 overflow-hidden">
+            <div class="px-4 pt-4 pb-3 flex items-center justify-between">
+              <h3 class="font-semibold text-slate-700">Детализация по дням</h3>
+              <div class="flex items-center gap-2">
+                <input id="search" placeholder="Поиск по дате…" class="px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2"/>
+                <button id="exportCsv" class="text-sm px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200">Экспорт CSV</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="min-w-full text-sm">
+                <thead class="bg-slate-50 text-slate-500">
+                  <tr>
+                    <th class="text-left px-4 py-3">Дата</th>
+                    <th class="text-left px-4 py-3">Лиды</th>
+                    <th class="text-left px-4 py-3">CPL</th>
+                    <th class="text-left px-4 py-3">Бюджет</th>
+                    <th class="text-left px-4 py-3">Показы</th>
+                    <th class="text-left px-4 py-3">Клики</th>
+                    <th class="text-left px-4 py-3">CTR</th>
+                  </tr>
+                </thead>
+                <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+                <tfoot class="bg-blue-50/60 font-semibold">
+                  <tr>
+                    <td class="px-4 py-3">Итого</td>
+                    <td id="tLeads"  class="px-4 py-3">—</td>
+                    <td id="tCpl"    class="px-4 py-3">—</td>
+                    <td id="tSpend"  class="px-4 py-3">—</td>
+                    <td id="tImpr"   class="px-4 py-3">—</td>
+                    <td id="tClicks" class="px-4 py-3">—</td>
+                    <td id="tCtr"    class="px-4 py-3">—</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </section>
+        </main>
+      </div>
+    `;
+
+    function kpiCard(label, id, color){
+      const bg = {blue:'bg-blue-50',emerald:'bg-emerald-50',orange:'bg-orange-50',violet:'bg-violet-50'}[color];
+      const stroke = {blue:'#2563eb',emerald:'#059669',orange:'#ea580c',violet:'#7c3aed'}[color];
+      const base   = {blue:'#e5edff',emerald:'#dcfce7',orange:'#ffedd5',violet:'#ede9fe'}[color];
+      return `
+        <div class="card p-4 ring-on">
+          <div class="flex items-center gap-3">
+            <div class="kpi-circle ${bg}">
+              <svg viewBox="0 0 36 36" class="w-[92px] h-[92px]">
+                <path stroke="${base}" stroke-width="3.5" fill="none" d="M18 2a16 16 0 1 1 0 32 16 16 0 0 1 0-32"/>
+                <path id="${id}Stroke" stroke="${stroke}" stroke-linecap="round" stroke-width="3.5" fill="none" d="M18 2a16 16 0 1 1 0 32 16 16 0 0 1 0-32" stroke-dasharray="100" stroke-dashoffset="100"/>
+              </svg>
+              <span id="${id}" class="absolute font-extrabold text-xl">—</span>
+            </div>
+            <div>
+              <div class="text-xs uppercase tracking-wide text-slate-500">${label}</div>
+              <div id="${id}Delta" class="text-xs text-slate-400 mt-1"> </div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    // ---------- DOM refs ----------
+    const monthSelect = document.getElementById('monthSelect');
+    const cityList = document.getElementById('cityList');
+    const btnApply = document.getElementById('apply');
+    const btnRefresh = document.getElementById('refresh');
+    const inputSearch = document.getElementById('search');
+    const tbody = document.getElementById('tableBody');
+
+    // ---------- Render base lists ----------
+    function renderCities(cities){
+      cityList.innerHTML = '';
+      cities.forEach(c=>{
+        const id = 'c_'+c.replace(/[^\w]/g,'_');
+        const el = document.createElement('label');
+        el.className = 'flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer';
+        el.innerHTML = `<input id="${id}" name="city" type="radio" class="accent-blue-600" value="${c}"> <span>${c}</span>`;
+        cityList.appendChild(el);
+      });
+
+      const saved = localStorage.getItem('lastSelectedCity');
+      const toPick = saved && cities.includes(saved) ? saved : cities[0];
+      cityList.querySelector(`input[value="${toPick}"]`).checked = true;
+      currentCity = toPick;
+      document.getElementById('cityName').textContent = toPick;
+    }
+
+    function renderMonths(monthKeys){
+      if (!monthKeys || monthKeys.length === 0){
+        monthSelect.innerHTML = `<option value="">Нет данных</option>`;
+        currentMonthKey = "";
+        return;
+      }
+      monthSelect.innerHTML = monthKeys
+        .sort(byMonthDesc)
+        .map(k=>{
+          const label = new Date(`${k}-01`).toLocaleString('ru-RU', {month:'long', year:'numeric'}).replace(' г.','');
+          return `<option value="${k}">${label}</option>`;
+        }).join('');
+      currentMonthKey = monthSelect.value;
+    }
+
+    function renderEmptyState(cityName = ''){
+      document.getElementById('kpiLeads').textContent = '0';
+      document.getElementById('kpiCtr').textContent   = '0.0%';
+      document.getElementById('kpiCpl').textContent   = '$0.00';
+      document.getElementById('kpiSpend').textContent = '$0.00';
+
+      ['kpiLeadsStroke','kpiCtrStroke','kpiCplStroke','kpiSpendStroke'].forEach(id=>{
+        const p = document.getElementById(id); if(p) p.style.strokeDashoffset = 100;
+      });
+
+      document.getElementById('sumImpr').textContent = '0';
+      document.getElementById('sumClicks').textContent = '0';
+      document.getElementById('cityName').textContent = cityName || currentCity || '—';
+
+      tbody.innerHTML = `<tr><td class="px-4 py-6" colspan="7">Нет данных</td></tr>`;
+      document.getElementById('tLeads').textContent  = '0';
+      document.getElementById('tSpend').textContent  = '$0.00';
+      document.getElementById('tImpr').textContent   = '0';
+      document.getElementById('tClicks').textContent = '0';
+      document.getElementById('tCtr').textContent    = '0.0%';
+      document.getElementById('tCpl').textContent    = '$0.00';
+
+      const ctx = document.getElementById('lineChart').getContext('2d');
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type:'line',
+        data:{ labels:[], datasets:[{data:[], borderWidth:2}] },
+        options:{ plugins:{legend:{display:false}}, scales:{x:{display:false},y:{display:false}} }
+      });
+
+      const label = currentMonthKey
+        ? new Date(`${currentMonthKey}-01`).toLocaleString('ru-RU',{month:'long',year:'numeric'}).replace(' г.','')
+        : '—';
+      document.getElementById('chartMeta').textContent = `${label}, город: ${cityName || currentCity || '—'}`;
+    }
+
+    function renderTable(rows){
+      if (!rows || rows.length === 0){
+        renderEmptyState();
+        return;
+      }
+      const q = (inputSearch.value||'').trim();
+      const filtered = q ? rows.filter(r=>r.date.includes(q)) : rows;
+
+      tbody.innerHTML = filtered.map(r=>`
+        <tr class="hover:bg-slate-50/80">
+          <td class="px-4 py-3 font-medium">${r.date}</td>
+          <td class="px-4 py-3">${r.leads}</td>
+          <td class="px-4 py-3">${money(r.cpl)}</td>
+          <td class="px-4 py-3">${money(r.spend)}</td>
+          <td class="px-4 py-3">${num(r.impr)}</td>
+          <td class="px-4 py-3">${num(r.clicks)}</td>
+          <td class="px-4 py-3">${pct(r.ctr)}</td>
+        </tr>
+      `).join('');
+
+      const t = calcTotals(filtered);
+      document.getElementById('tLeads').textContent = num(t.leads);
+      document.getElementById('tSpend').textContent = money(t.spend);
+      document.getElementById('tImpr').textContent = num(t.impr);
+      document.getElementById('tClicks').textContent = num(t.clicks);
+      document.getElementById('tCtr').textContent = pct(t.avgCtr);
+      document.getElementById('tCpl').textContent = money(t.avgCpl);
+
+      document.getElementById('kpiLeads').textContent = num(t.leads);
+      document.getElementById('kpiCtr').textContent = pct(t.avgCtr);
+      document.getElementById('kpiCpl').textContent = money(t.avgCpl);
+      document.getElementById('kpiSpend').textContent = money(t.spend);
+
+      animateStroke('kpiLeadsStroke', Math.min(100, (t.leads/100)*100));
+      animateStroke('kpiCtrStroke',   Math.min(100, (t.avgCtr*100)/5));
+      animateStroke('kpiCplStroke',   Math.max(0, 100 - (t.avgCpl*20)));
+      animateStroke('kpiSpendStroke', Math.min(100, (t.spend/200)*100));
+
+      document.getElementById('sumImpr').textContent = num(t.impr);
+      document.getElementById('sumClicks').textContent = num(t.clicks);
+
+      const label = new Date(`${currentMonthKey}-01`).toLocaleString('ru-RU',{month:'long',year:'numeric'}).replace(' г.','');
+      document.getElementById('chartMeta').textContent = `${label}, город: ${currentCity}`;
+
+      renderChart(filtered);
+    }
+
+    function animateStroke(id, pct){
+      const path = document.getElementById(id);
+      if(!path) return;
+      const len = 100, target = Math.max(0, len - (len*pct/100));
+      path.animate([{strokeDashoffset: len},{strokeDashoffset: target}],{duration:600, fill:'forwards', easing:'ease-out'});
+    }
+
+    function renderChart(rows){
+      const ctx = document.getElementById('lineChart').getContext('2d');
+      const labels = rows.map(r=>r.date);
+      const values = rows.map(r=>r.leads);
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type:'line',
+        data:{ labels, datasets:[{ label:'Лиды', data:values, borderWidth:2, tension:.35, pointRadius:3, fill:false }] },
+        options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ x:{grid:{display:false}}, y:{grid:{color:'rgba(148,163,184,.2)'}, beginAtZero:true } } }
+      });
+    }
+
+    // ---------- Data pipeline ----------
+    let cityCache = {}; // {city: { months:{'YYYY-MM': rows}, keys:[...]} }
+
+    function getCityObj(city){
+      return allData.find(x=>x.city===city);
+    }
+
+    function ensureCityCache(city){
+      if (cityCache[city]) return cityCache[city];
+      const grouped = groupByMonth(getCityObj(city) || {data:[]});
+      const keys = Object.keys(grouped);
+      cityCache[city] = {months:grouped, keys};
+      return cityCache[city];
+    }
+
+    function applyRender(){
+      localStorage.setItem('lastSelectedCity', currentCity);
+      document.getElementById('cityName').textContent = currentCity;
+
+      const cache = ensureCityCache(currentCity);
+
+      if (!cache.keys || cache.keys.length === 0){
+        renderMonths([]);
+        currentMonthKey = "";
+        renderEmptyState(currentCity);
+        return;
+      }
+
+      if (!cache.keys.includes(currentMonthKey)){
+        renderMonths(cache.keys);
+      }
+
+      const rows = cache.months[currentMonthKey] || [];
+      renderTable(rows);
+    }
+
+    // ---------- Events ----------
+    btnApply.addEventListener('click',()=>{
+      const picked = cityList.querySelector('input[name="city"]:checked');
+      if (picked){ currentCity = picked.value; }
+      currentMonthKey = monthSelect.value || "";
+      applyRender();
+    });
+
+    btnRefresh.addEventListener('click', async ()=>{
+      try{
+        btnRefresh.disabled = true; btnRefresh.textContent = 'Обновляю…';
+        cityCache = {};
+        allData = await fetchAll();
+        const cities = allData.map(x=>x.city);
+        renderCities(cities);
+        const cache = ensureCityCache(currentCity);
+        renderMonths(cache.keys);
+        applyRender();
+      }catch(e){
+        alert('Ошибка обновления');
+        console.error(e);
+      }finally{
+        btnRefresh.disabled = false; btnRefresh.textContent = ' Обновить данные';
+      }
+    });
+
+    inputSearch.addEventListener('input', ()=> {
+      const cache = ensureCityCache(currentCity);
+      const rows = cache.months[currentMonthKey] || [];
+      renderTable(rows);
+    });
+
+    document.getElementById('exportCsv').addEventListener('click', ()=>{
+      const cache = ensureCityCache(currentCity);
+      const rows = cache.months[currentMonthKey] || [];
+      const header = ['date','leads','cpl','spend','impr','clicks','ctr'];
+      const csv = [header.join(',')].concat(rows.map(r=>[r.date,r.leads,r.cpl,r.spend,r.impr,r.clicks,r.ctr].join(','))).join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${currentCity}_${currentMonthKey}.csv`; a.click();
+    });
+
+    // ---------- Bootstrap ----------
+    (async function init(){
+      try{
+        allData = await fetchAll();
+        const cities = allData.map(x=>x.city);
+        renderCities(cities);
+
+        const cache = ensureCityCache(currentCity);
+        renderMonths(cache.keys);
+
+        if (!cache.keys || cache.keys.length === 0){
+          renderEmptyState(currentCity);
+        } else {
+          const rows = cache.months[currentMonthKey] || [];
+          renderTable(rows);
+        }
+      }catch(e){
+        app.innerHTML = `<div class="max-w-xl mx-auto p-8 text-center">Ошибка загрузки данных</div>`;
+        console.error(e);
+      }
+    })();
+
+  })();
+  </script>
+</body>
+</html>
