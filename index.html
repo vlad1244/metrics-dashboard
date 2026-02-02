@@ -178,7 +178,8 @@
                 cityObj.data.slice(1).forEach(row => {
                     if(!row[0]) return;
                     const mKey = row[0].substring(0, 7);
-                    (months[mKey] ||= []).push(row);
+                    if (!months[mKey]) months[mKey] = [];
+months[mKey].push(row);
                 });
                 cachedMonthsByCity[cityObj.city] = months;
             });
