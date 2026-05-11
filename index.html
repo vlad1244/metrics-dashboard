@@ -35,20 +35,20 @@
 
 <div id="app" class="min-h-screen">
     <div id="mainContent" class="blur-mode mx-auto max-w-[1400px] px-4 py-8 grid grid-cols-12 gap-6">
-        
+
         <aside class="col-span-12 lg:col-span-3 space-y-6">
           <div class="card p-6">
             <div class="flex items-center justify-between mb-6 border-b pb-4">
                 <span class="text-[10px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-2 py-1 rounded">Настройки</span>
                 <button id="logoutBtn" class="text-xs font-bold text-slate-400 hover:text-red-500 transition-colors uppercase">Выйти</button>
             </div>
-            
+
             <label class="block text-xs font-bold text-slate-400 uppercase mb-3">Город:</label>
             <div id="cityList" class="space-y-1 max-h-[350px] overflow-auto mb-6 pr-2 border-b pb-4"></div>
-            
+
             <label class="block text-xs font-bold text-slate-400 uppercase mb-3">Месяц:</label>
             <select id="monthSelect" class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 transition-all"></select>
-            
+
             <button id="apply" class="w-full mt-6 bg-blue-600 text-white font-bold py-4 rounded-xl shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95">ПРИМЕНИТЬ</button>
           </div>
         </aside>
@@ -116,25 +116,10 @@
 
 <script>
 (function(){
-    const MASTER_CODE = "7007";
-    const ACCESS_MAP = {
-        "4912": ["Астана", "Шымкент/1", "Алматы", "Талдыкорган", "Туркестан"],
-        "8235": ["Бишкек", "Ош"],
-        "6183": ["Актобе"],
-        "1067": ["Кокшетау", "Павлодар"],
-        "5591": ["Караганда"],
-        "3480": ["Темиртау", "Жанаозен"],
-        "9214": ["Семей"],
-        "6742": ["Фергана", "Коканд", "Андижан"],
-        "2859": ["Наманган"],
-        "4130": ["Ташкент", "Самарканд", "Джизак","Ташкент2", "Термиз", "Самарканд2"],
-        "7603": ["Бухара", "Карши"],
-        "5826": ["Навои"]
-    };
+    const API = 'https://metrics-api-rwm4brhysa-uc.a.run.app';
 
     let allData = [];
-    let isMaster = false;
-    let allowedCities = [];
+    let sessionCode = null;
     let chart = null;
     let cachedMonthsByCity = {};
 
@@ -149,47 +134,69 @@
         return isNaN(f) ? 0 : f;
     };
 
-    document.getElementById('loginBtn').onclick = function() {
-        const pass = document.getElementById('passInput').value;
-        if (pass === MASTER_CODE) { isMaster = true; enter(); }
-        else if (ACCESS_MAP[pass]) { isMaster = false; allowedCities = ACCESS_MAP[pass]; enter(); }
-        else { 
-            document.getElementById('loginError').style.opacity = '1';
-            setTimeout(() => document.getElementById('loginError').style.opacity = '0', 2000);
+    async function doLogin() {
+        const code = document.getElementById('passInput').value.trim();
+        if (!code) return;
+
+        const btn = document.getElementById('loginBtn');
+        const errEl = document.getElementById('loginError');
+        btn.textContent = 'ПРОВЕРКА…';
+        btn.disabled = true;
+
+        try {
+            const res = await fetch(API + '/metrics', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code })
+            });
+
+            if (res.status === 401) {
+                errEl.style.opacity = '1';
+                setTimeout(() => errEl.style.opacity = '0', 2000);
+                btn.textContent = 'ВОЙТИ';
+                btn.disabled = false;
+                return;
+            }
+
+            const data = await res.json();
+            sessionCode = code;
+            allData = data.filter(item => item.data);
+            enter();
+        } catch (e) {
+            errEl.textContent = 'ОШИБКА СОЕДИНЕНИЯ';
+            errEl.style.opacity = '1';
+            setTimeout(() => { errEl.style.opacity = '0'; errEl.textContent = 'НЕВЕРНЫЙ КОД'; }, 2000);
+            btn.textContent = 'ВОЙТИ';
+            btn.disabled = false;
         }
-    };
+    }
+
+    document.getElementById('loginBtn').onclick = doLogin;
+    document.getElementById('passInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
     function enter() {
         document.getElementById('loginScreen').classList.add('hidden');
         document.getElementById('mainContent').classList.remove('blur-mode');
-        initDashboard();
+
+        cachedMonthsByCity = {};
+        allData.forEach(cityObj => {
+            const months = {};
+            (cityObj.data || []).slice(1).forEach(row => {
+                if (!row[0]) return;
+                const mKey = row[0].substring(0, 7);
+                if (!months[mKey]) months[mKey] = [];
+                months[mKey].push(row);
+            });
+            cachedMonthsByCity[cityObj.city] = months;
+        });
+
+        renderCityList();
+        if (allData.length > 0) {
+            updateUIAfterSelection(allData[0].city);
+        }
     }
 
     document.getElementById('logoutBtn').onclick = () => location.reload();
-
-    async function initDashboard() {
-        try {
-            const res = await fetch('https://metrics-api-rwm4brhysa-uc.a.run.app/metrics');
-            const data = await res.json();
-            allData = isMaster ? data : data.filter(item => allowedCities.includes(item.city));
-
-            allData.forEach(cityObj => {
-                const months = {};
-                cityObj.data.slice(1).forEach(row => {
-                    if(!row[0]) return;
-                    const mKey = row[0].substring(0, 7);
-                    if (!months[mKey]) months[mKey] = [];
-months[mKey].push(row);
-                });
-                cachedMonthsByCity[cityObj.city] = months;
-            });
-
-            renderCityList();
-            if(allData.length > 0) {
-                updateUIAfterSelection(allData[0].city);
-            }
-        } catch (e) { alert("Ошибка загрузки данных"); }
-    }
 
     function renderCityList() {
         const container = document.getElementById('cityList');
@@ -199,7 +206,7 @@ months[mKey].push(row);
                 <span class="text-sm font-bold text-slate-600">${item.city}</span>
             </label>
         `).join('');
-        if(allData[0]) updateMonthDropdown(allData[0].city);
+        if (allData[0]) updateMonthDropdown(allData[0].city);
     }
 
     window.updateMonthDropdown = function(cityName) {
@@ -227,7 +234,7 @@ months[mKey].push(row);
     function renderDashboard(cityName, monthKey) {
         document.getElementById('cityName').textContent = cityName;
         const rows = (cachedMonthsByCity[cityName] || {})[monthKey] || [];
-        
+
         const tbody = document.getElementById('tableBody');
         let tL = 0, tS = 0, tI = 0, tC = 0;
 
@@ -245,17 +252,14 @@ months[mKey].push(row);
             </tr>`;
         }).join('');
 
-        // Расчет итогов
         const avgCtr = tI > 0 ? (tC / tI) * 100 : 0;
         const avgCpl = tL > 0 ? (tS / tL) : 0;
 
-        // KPI блоки
         document.getElementById('kpiLeads').textContent = num(tL);
         document.getElementById('kpiSpend').textContent = money(tS);
         document.getElementById('kpiCpl').textContent = money(avgCpl);
         document.getElementById('kpiCtr').textContent = pct(avgCtr);
 
-        // Футер таблицы
         document.getElementById('tLeads').textContent = num(tL);
         document.getElementById('tSpend').textContent = money(tS);
         document.getElementById('tImpr').textContent = num(tI);
@@ -273,20 +277,20 @@ months[mKey].push(row);
             type: 'line',
             data: {
                 labels: rows.map(r => r[0].split('-')[2]),
-                datasets: [{ 
-                    label: 'Лиды', 
-                    data: rows.map(r => parseNum(r[1])), 
-                    borderColor: '#2563eb', 
-                    borderWidth: 4, tension: 0.4, fill: true, 
+                datasets: [{
+                    label: 'Лиды',
+                    data: rows.map(r => parseNum(r[1])),
+                    borderColor: '#2563eb',
+                    borderWidth: 4, tension: 0.4, fill: true,
                     backgroundColor: 'rgba(37,99,235,0.05)', pointRadius: 4, pointHoverRadius: 6
                 }]
             },
-            options: { 
-                plugins: { legend: { display: false } }, 
-                scales: { 
+            options: {
+                plugins: { legend: { display: false } },
+                scales: {
                     y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
                     x: { grid: { display: false } }
-                } 
+                }
             }
         });
     }
