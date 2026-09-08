@@ -49,6 +49,13 @@
             <label class="block text-xs font-bold text-slate-400 uppercase mb-3">Месяц:</label>
             <select id="monthSelect" class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 transition-all"></select>
 
+            <div id="serviceFilterBlock" class="hidden mt-6">
+              <label class="block text-xs font-bold text-slate-400 uppercase mb-3">Направление:</label>
+              <select id="serviceSelect" class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 transition-all">
+                <option value="all">Все</option>
+              </select>
+            </div>
+
             <button id="apply" class="w-full mt-6 bg-blue-600 text-white font-bold py-4 rounded-xl shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95">ПРИМЕНИТЬ</button>
           </div>
         </aside>
@@ -93,6 +100,7 @@
                     <th class="px-6 py-5">Показы</th>
                     <th class="px-6 py-5">Клики</th>
                     <th class="px-6 py-5">CTR</th>
+                    <th class="px-6 py-5">Направление</th>
                   </tr>
                 </thead>
                 <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
@@ -122,6 +130,11 @@
     let sessionCode = null;
     let chart = null;
     let cachedMonthsByCity = {};
+    let cachedLabelsByCity = {};
+
+    const SERVICE_COLORS = { 'ЛЭ': '#2563eb', 'Отбеливание': '#f97316' };
+    const FALLBACK_COLORS = ['#2563eb', '#f97316', '#10b981', '#a855f7'];
+    const colorForLabel = (label, idx) => SERVICE_COLORS[label] || FALLBACK_COLORS[idx % FALLBACK_COLORS.length];
 
     const money = n => '$' + (n || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     const num = n => (n || 0).toLocaleString('ru-RU');
@@ -179,15 +192,19 @@
         document.getElementById('mainContent').classList.remove('blur-mode');
 
         cachedMonthsByCity = {};
+        cachedLabelsByCity = {};
         allData.forEach(cityObj => {
             const months = {};
+            const labels = new Set();
             (cityObj.data || []).slice(1).forEach(row => {
                 if (!row[0]) return;
                 const mKey = row[0].substring(0, 7);
                 if (!months[mKey]) months[mKey] = [];
                 months[mKey].push(row);
+                if (row[7]) labels.add(row[7]);
             });
             cachedMonthsByCity[cityObj.city] = months;
+            cachedLabelsByCity[cityObj.city] = Array.from(labels).sort();
         });
 
         renderCityList();
@@ -217,23 +234,41 @@
            const label = new Date(k + "-01").toLocaleString('ru-RU', {month:'long', year:'numeric'}).replace(' г.','');
            return `<option value="${k}">${label}</option>`;
         }).join('');
+        updateServiceDropdown(cityName);
     };
+
+    function updateServiceDropdown(cityName) {
+        const block = document.getElementById('serviceFilterBlock');
+        const sSelect = document.getElementById('serviceSelect');
+        const labels = cachedLabelsByCity[cityName] || [];
+        if (labels.length < 2) {
+            block.classList.add('hidden');
+            sSelect.innerHTML = '<option value="all">Все</option>';
+            return;
+        }
+        block.classList.remove('hidden');
+        sSelect.innerHTML = '<option value="all">Все</option>' + labels.map(l => `<option value="${l}">${l}</option>`).join('');
+    }
 
     document.getElementById('apply').onclick = () => {
         const city = document.querySelector('input[name="city"]:checked').value;
         const month = document.getElementById('monthSelect').value;
-        renderDashboard(city, month);
+        const service = document.getElementById('serviceSelect').value;
+        renderDashboard(city, month, service);
     };
 
     function updateUIAfterSelection(cityName) {
         updateMonthDropdown(cityName);
         const firstMonth = document.getElementById('monthSelect').value;
-        renderDashboard(cityName, firstMonth);
+        renderDashboard(cityName, firstMonth, 'all');
     }
 
-    function renderDashboard(cityName, monthKey) {
+    function renderDashboard(cityName, monthKey, serviceFilter) {
         document.getElementById('cityName').textContent = cityName;
-        const rows = (cachedMonthsByCity[cityName] || {})[monthKey] || [];
+        const allRows = (cachedMonthsByCity[cityName] || {})[monthKey] || [];
+        const rows = (!serviceFilter || serviceFilter === 'all')
+            ? allRows
+            : allRows.filter(r => r[7] === serviceFilter);
 
         const tbody = document.getElementById('tableBody');
         let tL = 0, tS = 0, tI = 0, tC = 0;
@@ -249,6 +284,7 @@
                 <td class="px-6 py-4 text-slate-400">${num(im)}</td>
                 <td class="px-6 py-4 text-slate-400">${num(cl)}</td>
                 <td class="px-6 py-4 font-bold text-blue-600">${pct(ct)}</td>
+                <td class="px-6 py-4 text-slate-400">${r[7] || '—'}</td>
             </tr>`;
         }).join('');
 
@@ -273,20 +309,44 @@
     function renderChart(rows) {
         const ctx = document.getElementById('lineChart').getContext('2d');
         if (chart) chart.destroy();
+
+        const distinctLabels = Array.from(new Set(rows.map(r => r[7]).filter(Boolean))).sort();
+        const dates = Array.from(new Set(rows.map(r => r[0]))).sort();
+
+        let datasets;
+        if (distinctLabels.length > 1) {
+            datasets = distinctLabels.map((label, idx) => {
+                const byDate = {};
+                rows.filter(r => r[7] === label).forEach(r => { byDate[r[0]] = parseNum(r[1]); });
+                const color = colorForLabel(label, idx);
+                return {
+                    label,
+                    data: dates.map(d => byDate[d] || 0),
+                    borderColor: color,
+                    borderWidth: 4, tension: 0.4, fill: true,
+                    backgroundColor: color + '0d', pointRadius: 4, pointHoverRadius: 6
+                };
+            });
+        } else {
+            const byDate = {};
+            rows.forEach(r => { byDate[r[0]] = (byDate[r[0]] || 0) + parseNum(r[1]); });
+            datasets = [{
+                label: 'Лиды',
+                data: dates.map(d => byDate[d] || 0),
+                borderColor: '#2563eb',
+                borderWidth: 4, tension: 0.4, fill: true,
+                backgroundColor: 'rgba(37,99,235,0.05)', pointRadius: 4, pointHoverRadius: 6
+            }];
+        }
+
         chart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: rows.map(r => r[0].split('-')[2]),
-                datasets: [{
-                    label: 'Лиды',
-                    data: rows.map(r => parseNum(r[1])),
-                    borderColor: '#2563eb',
-                    borderWidth: 4, tension: 0.4, fill: true,
-                    backgroundColor: 'rgba(37,99,235,0.05)', pointRadius: 4, pointHoverRadius: 6
-                }]
+                labels: dates.map(d => d.split('-')[2]),
+                datasets
             },
             options: {
-                plugins: { legend: { display: false } },
+                plugins: { legend: { display: distinctLabels.length > 1 } },
                 scales: {
                     y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
                     x: { grid: { display: false } }
