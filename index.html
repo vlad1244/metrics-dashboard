@@ -61,6 +61,11 @@
         </aside>
 
         <main class="col-span-12 lg:col-span-9 space-y-6">
+          <div id="updateInfo" class="card px-6 py-4 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+            <span class="font-bold text-slate-700">🕘 Данные за вчерашний день появляются каждое утро в <span id="updTime" class="text-blue-600">—</span> <span class="text-slate-400 font-normal">(по вашему времени)</span></span>
+            <span class="text-slate-500">Следующее обновление через <b id="updLeft" class="text-slate-800">—</b></span>
+            <span class="text-slate-500">Последний день в таблице: <b id="lastDay" class="text-slate-800">—</b></span>
+          </div>
           <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="card p-5 border-b-4 border-blue-500">
                 <div class="text-2xl font-black text-slate-800" id="kpiLeads">0</div>
@@ -124,6 +129,22 @@
 
 <script>
 (function(){
+
+    // Daily refresh: Cloud Scheduler runs the sheet job at 03:00 UTC, data is ready ~03:15 UTC. Shown in the viewer's local time.
+    const UPDATE_UTC_H = 3, UPDATE_UTC_M = 15;
+    function nextUpdate() {
+        const now = new Date();
+        const t = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), UPDATE_UTC_H, UPDATE_UTC_M));
+        if (t <= now) t.setUTCDate(t.getUTCDate() + 1);
+        return t;
+    }
+    function tickUpdate() {
+        const t = nextUpdate();
+        document.getElementById('updTime').textContent = t.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        const m = Math.max(0, Math.round((t - new Date()) / 60000));
+        document.getElementById('updLeft').textContent = (Math.floor(m / 60) ? Math.floor(m / 60) + ' ч ' : '') + (m % 60) + ' мин';
+    }
+    tickUpdate(); setInterval(tickUpdate, 30000);
     const API = 'https://metrics-api-rwm4brhysa-uc.a.run.app';
 
     let allData = [];
@@ -196,8 +217,8 @@
         allData.forEach(cityObj => {
             const months = {};
             const labels = new Set();
-            (cityObj.data || []).slice(1).forEach(row => {
-                if (!row[0]) return;
+            (cityObj.data || []).forEach(row => {
+                if (!row[0] || !/^\d{4}-\d{2}-\d{2}$/.test(row[0])) return;  // skip header / empty rows (some sheets have no header)
                 const mKey = row[0].substring(0, 7);
                 if (!months[mKey]) months[mKey] = [];
                 months[mKey].push(row);
@@ -266,6 +287,9 @@
     function renderDashboard(cityName, monthKey, serviceFilter) {
         document.getElementById('cityName').textContent = cityName;
         const allRows = (cachedMonthsByCity[cityName] || {})[monthKey] || [];
+        const allCityDates = Object.values(cachedMonthsByCity[cityName] || {}).flat().map(r => r[0]).filter(Boolean).sort();
+        const ld = allCityDates[allCityDates.length - 1];
+        document.getElementById('lastDay').textContent = ld ? ld.split('-').reverse().slice(0, 2).join('.') : '—';
         const rows = (!serviceFilter || serviceFilter === 'all')
             ? allRows
             : allRows.filter(r => r[7] === serviceFilter);
