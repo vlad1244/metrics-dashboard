@@ -240,7 +240,7 @@
         const container = document.getElementById('cityList');
         container.innerHTML = allData.map((item, idx) => `
             <label class="flex items-center gap-3 p-3 rounded-xl hover:bg-blue-50 cursor-pointer transition-all">
-                <input type="radio" name="city" value="${item.city}" ${idx===0?'checked':''} onchange="updateMonthDropdown(this.value)">
+                <input type="radio" name="city" value="${item.city}" ${idx===0?'checked':''} onchange="updateUIAfterSelection(this.value)">
                 <span class="text-sm font-bold text-slate-600">${item.city}</span>
             </label>
         `).join('');
@@ -270,6 +270,11 @@
         block.classList.remove('hidden');
         sSelect.innerHTML = '<option value="all">Все</option>' + labels.map(l => `<option value="${l}">${l}</option>`).join('');
     }
+
+    // city / month / service change re-renders right away; the button stays for habit
+    document.getElementById('monthSelect').onchange = () => document.getElementById('apply').click();
+    document.getElementById('serviceSelect').onchange = () => document.getElementById('apply').click();
+    window.updateUIAfterSelection = (c) => updateUIAfterSelection(c);
 
     document.getElementById('apply').onclick = () => {
         const city = document.querySelector('input[name="city"]:checked').value;
