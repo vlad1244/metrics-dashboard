@@ -299,6 +299,8 @@ tfoot td{font-weight:800;background:var(--accent-soft);border-bottom:0}
     const sv = svcsOf(city);
     $('svcBlock').classList.toggle('hidden', sv.length < 2);
     $('svc').innerHTML = '<option value="all">Все направления</option>' + sv.map(s => `<option>${s}</option>`).join('');
+    // laser opens first where a city has several services (Бишкек, Ош)
+    if (sv.length > 1 && sv.includes('ЛЭ')) { state.svc = 'ЛЭ'; $('svc').value = 'ЛЭ'; }
     render();
   }
   $('month').onchange = e => { state.month = e.target.value; state.day = null; render(); };
