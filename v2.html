@@ -69,11 +69,8 @@ h2.title{margin:4px 0 2px;font-size:30px;font-weight:800;letter-spacing:-.01em;t
 .kpi{padding:18px;display:flex;flex-direction:column;gap:6px;min-width:0}
 .kpi .k{font-size:12px;color:var(--muted);font-weight:500}
 .kpi .v{font-size:28px;font-weight:800;letter-spacing:-.01em}
-.kpi .d{font-size:12px;color:var(--muted)}
-.up{color:var(--good);font-weight:600}.down{color:var(--bad);font-weight:600}
 .kpi.main{background:linear-gradient(135deg,#2f5bea 0%,#5b7cff 100%);color:#fff}
-.kpi.main .k,.kpi.main .d{color:rgba(255,255,255,.8)}
-.kpi.main .up,.kpi.main .down{color:#fff}
+.kpi.main .k{color:rgba(255,255,255,.8)}
 
 .row2{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:14px;align-items:start}
 .panel{padding:20px;display:flex;flex-direction:column;gap:14px;min-width:0}
@@ -182,10 +179,10 @@ tfoot td{font-weight:800;background:var(--accent-soft);border-bottom:0}
     </div>
 
     <section class="kpis">
-      <div class="card kpi main"><div class="k">Потрачено</div><div class="v" id="kSpend">—</div><div class="d" id="dSpend">&nbsp;</div></div>
-      <div class="card kpi"><div class="k">Заявки (переписки)</div><div class="v" id="kLeads">—</div><div class="d" id="dLeads">&nbsp;</div></div>
-      <div class="card kpi"><div class="k">Цена заявки</div><div class="v" id="kCpl">—</div><div class="d" id="dCpl">&nbsp;</div></div>
-      <div class="card kpi"><div class="k">CTR</div><div class="v" id="kCtr">—</div><div class="d" id="dCtr">&nbsp;</div></div>
+      <div class="card kpi main"><div class="k">Потрачено</div><div class="v" id="kSpend">—</div></div>
+      <div class="card kpi"><div class="k">Заявки (переписки)</div><div class="v" id="kLeads">—</div></div>
+      <div class="card kpi"><div class="k">Цена заявки</div><div class="v" id="kCpl">—</div></div>
+      <div class="card kpi"><div class="k">CTR</div><div class="v" id="kCtr">—</div></div>
     </section>
 
     <section class="row2">
@@ -319,21 +316,12 @@ tfoot td{font-weight:800;background:var(--accent-soft);border-bottom:0}
     });
     return Object.values(by).sort((a,b) => a.date < b.date ? -1 : 1);
   }
-  const sum = (rows, maxDay) => rows.reduce((t,d) => {
-    if (maxDay && +d.date.slice(8) > maxDay) return t;
+  const sum = rows => rows.reduce((t,d) => {
     t.leads += d.leads; t.spend += d.spend; t.impr += d.impr; t.clicks += d.clicks; return t;
   }, {leads:0, spend:0, impr:0, clicks:0});
   const cplOf = t => t.leads ? t.spend / t.leads : 0;
   const ctrOf = t => t.impr ? t.clicks / t.impr * 100 : 0;
 
-  function delta(el, cur, prev, goodWhenUp){
-    if (!prev) { el.innerHTML = 'нет данных за прошлый месяц'; return; }
-    const ch = (cur - prev) / prev * 100;
-    if (!isFinite(ch)) { el.innerHTML = '&nbsp;'; return; }
-    const good = goodWhenUp === null ? null : (ch >= 0) === goodWhenUp;
-    const cls = good === null ? '' : (good ? 'up' : 'down');
-    el.innerHTML = `<span class="${cls}">${ch >= 0 ? '+' : ''}${ch.toFixed(1)}%</span> к тем же дням прошлого месяца`;
-  }
 
   function render(){
     const {city, month, svc} = state;
@@ -345,15 +333,11 @@ tfoot td{font-weight:800;background:var(--accent-soft);border-bottom:0}
     $('subtitle').textContent = 'Результаты рекламы за ' + monthName(month);
 
     const t = sum(rows);
-    const maxDay = rows.length ? +rows[rows.length-1].date.slice(8) : 0;
-    const [y,m] = month.split('-').map(Number);
-    const pm = new Date(y, m-2, 1); const prevKey = pm.getFullYear() + '-' + String(pm.getMonth()+1).padStart(2,'0');
-    const p = sum(daily(city, prevKey, svc), maxDay);
 
-    $('kSpend').textContent = money(t.spend);  delta($('dSpend'), t.spend, p.spend, null);
-    $('kLeads').textContent = num(t.leads);    delta($('dLeads'), t.leads, p.leads, true);
-    $('kCpl').textContent = money(cplOf(t));   delta($('dCpl'), cplOf(t), cplOf(p), false);
-    $('kCtr').textContent = pct(ctrOf(t));     delta($('dCtr'), ctrOf(t), ctrOf(p), true);
+    $('kSpend').textContent = money(t.spend);
+    $('kLeads').textContent = num(t.leads);
+    $('kCpl').textContent = money(cplOf(t));
+    $('kCtr').textContent = pct(ctrOf(t));
 
     // day strip
     const mxS = Math.max(1, ...rows.map(d => d.spend)), mxL = Math.max(1, ...rows.map(d => d.leads));

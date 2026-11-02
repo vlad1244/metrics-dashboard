@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Analytics Pro Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{ --card:#fff; --radius:20px; --shadow:0 10px 30px rgba(15,23,42,0.08); }
+    body{background:#f8fafc; min-height:100vh; font-family: system-ui, -apple-system, sans-serif;}
+    .card{background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); border: 1px solid rgba(0,0,0,0.03);}
+    #mainContent.blur-mode { filter: blur(20px); pointer-events: none; }
+    #cityList::-webkit-scrollbar { width: 4px; }
+    #cityList::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+    .table-wrap{overflow:auto}
+    th { white-space: nowrap; }
+  </style>
+</head>
+<body>
+
+<div id="loginScreen" class="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900">
+  <div class="bg-white p-10 rounded-[32px] shadow-2xl max-w-sm w-full text-center mx-4">
+    <div class="mb-6 inline-flex items-center justify-center w-20 h-20 bg-blue-600 text-white rounded-3xl rotate-3 shadow-xl">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+    </div>
+    <h2 class="text-2xl font-black text-slate-800 mb-2">Metrics Access</h2>
+    <input type="text" id="passInput" maxlength="4" placeholder="0000" class="w-full text-center text-4xl tracking-[0.3em] font-black py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-blue-500 outline-none mb-4 mt-4 text-slate-700">
+    <div id="loginError" class="text-red-500 text-xs font-bold mb-4 opacity-0 transition-opacity">НЕВЕРНЫЙ КОД</div>
+    <button id="loginBtn" class="w-full bg-slate-900 text-white font-bold py-5 rounded-2xl hover:bg-blue-600 transition-all shadow-lg active:scale-95">ВОЙТИ</button>
+  </div>
+</div>
+
+<div id="app" class="min-h-screen">
+    <div id="mainContent" class="blur-mode mx-auto max-w-[1400px] px-4 py-8 grid grid-cols-12 gap-6">
+
+        <aside class="col-span-12 lg:col-span-3 space-y-6">
+          <div class="card p-6">
+            <div class="flex items-center justify-between mb-6 border-b pb-4">
+                <span class="text-[10px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-2 py-1 rounded">Настройки</span>
+                <button id="logoutBtn" class="text-xs font-bold text-slate-400 hover:text-red-500 transition-colors uppercase">Выйти</button>
+            </div>
+
+            <label class="block text-xs font-bold text-slate-400 uppercase mb-3">Город:</label>
+            <div id="cityList" class="space-y-1 max-h-[350px] overflow-auto mb-6 pr-2 border-b pb-4"></div>
+
+            <label class="block text-xs font-bold text-slate-400 uppercase mb-3">Месяц:</label>
+            <select id="monthSelect" class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 transition-all"></select>
+
+            <div id="serviceFilterBlock" class="hidden mt-6">
+              <label class="block text-xs font-bold text-slate-400 uppercase mb-3">Направление:</label>
+              <select id="serviceSelect" class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 transition-all">
+                <option value="all">Все</option>
+              </select>
+            </div>
+
+            <button id="apply" class="w-full mt-6 bg-blue-600 text-white font-bold py-4 rounded-xl shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95">ПРИМЕНИТЬ</button>
+          </div>
+        </aside>
+
+        <main class="col-span-12 lg:col-span-9 space-y-6">
+          <div id="updateInfo" class="card px-6 py-4 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+            <span class="font-bold text-slate-700">🕘 Данные за вчерашний день появляются каждое утро в <span id="updTime" class="text-blue-600">—</span> <span class="text-slate-400 font-normal">(по вашему времени)</span></span>
+            <span class="text-slate-500">Следующее обновление через <b id="updLeft" class="text-slate-800">—</b></span>
+            <span class="text-slate-500">Последний день в таблице: <b id="lastDay" class="text-slate-800">—</b></span>
+          </div>
+          <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="card p-5 border-b-4 border-blue-500">
+                <div class="text-2xl font-black text-slate-800" id="kpiLeads">0</div>
+                <div class="text-[10px] font-bold text-slate-400 uppercase mt-1 tracking-wider">Всего Лидов</div>
+            </div>
+            <div class="card p-5 border-b-4 border-emerald-500">
+                <div class="text-2xl font-black text-slate-800" id="kpiCtr">0%</div>
+                <div class="text-[10px] font-bold text-slate-400 uppercase mt-1 tracking-wider">Средний CTR</div>
+            </div>
+            <div class="card p-5 border-b-4 border-orange-500">
+                <div class="text-2xl font-black text-slate-800" id="kpiCpl">$0</div>
+                <div class="text-[10px] font-bold text-slate-400 uppercase mt-1 tracking-wider">Ср. Цена Лида</div>
+            </div>
+            <div class="card p-5 border-b-4 border-violet-500">
+                <div class="text-2xl font-black text-slate-800" id="kpiSpend">$0</div>
+                <div class="text-[10px] font-bold text-slate-400 uppercase mt-1 tracking-wider">Общий Бюджет</div>
+            </div>
+          </section>
+
+          <div class="card p-8">
+              <h3 class="font-black text-slate-800 uppercase tracking-tighter text-lg mb-6 flex items-center">
+                <span class="w-2 h-6 bg-blue-600 mr-3 rounded-full"></span>
+                Динамика лидов: <span id="cityName" class="text-blue-600 ml-2">—</span>
+              </h3>
+              <canvas id="lineChart" height="120"></canvas>
+          </div>
+
+          <div class="card overflow-hidden">
+            <div class="table-wrap">
+              <table class="min-w-full text-sm text-left">
+                <thead class="bg-slate-900 text-slate-400 font-bold uppercase text-[10px]">
+                  <tr>
+                    <th class="px-6 py-5">Дата</th>
+                    <th class="px-6 py-5 text-white">Лиды</th>
+                    <th class="px-6 py-5">CPL</th>
+                    <th class="px-6 py-5 text-white">Бюджет</th>
+                    <th class="px-6 py-5">Показы</th>
+                    <th class="px-6 py-5">Клики</th>
+                    <th class="px-6 py-5">CTR</th>
+                    <th class="px-6 py-5">Направление</th>
+                  </tr>
+                </thead>
+                <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+                <tfoot class="bg-blue-600 text-white font-bold">
+                  <tr>
+                    <td class="px-6 py-4 uppercase text-[10px] tracking-widest">ИТОГО ЗА МЕСЯЦ</td>
+                    <td id="tLeads" class="px-6 py-4 text-lg">—</td>
+                    <td id="tCpl" class="px-6 py-4">—</td>
+                    <td id="tSpend" class="px-6 py-4 text-lg">—</td>
+                    <td id="tImpr" class="px-6 py-4">—</td>
+                    <td id="tClicks" class="px-6 py-4">—</td>
+                    <td id="tCtr" class="px-6 py-4">—</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </main>
+    </div>
+</div>
+
+<script>
+(function(){
+
+    // Daily refresh: Cloud Scheduler runs the sheet job at 03:00 UTC, data is ready ~03:15 UTC. Shown in the viewer's local time.
+    const UPDATE_UTC_H = 3, UPDATE_UTC_M = 15;
+    function nextUpdate() {
+        const now = new Date();
+        const t = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), UPDATE_UTC_H, UPDATE_UTC_M));
+        if (t <= now) t.setUTCDate(t.getUTCDate() + 1);
+        return t;
+    }
+    function tickUpdate() {
+        const t = nextUpdate();
+        document.getElementById('updTime').textContent = t.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        const m = Math.max(0, Math.round((t - new Date()) / 60000));
+        document.getElementById('updLeft').textContent = (Math.floor(m / 60) ? Math.floor(m / 60) + ' ч ' : '') + (m % 60) + ' мин';
+    }
+    tickUpdate(); setInterval(tickUpdate, 30000);
+    const API = 'https://metrics-api-rwm4brhysa-uc.a.run.app';
+
+    let allData = [];
+    let sessionCode = null;
+    let chart = null;
+    let cachedMonthsByCity = {};
+    let cachedLabelsByCity = {};
+
+    const SERVICE_COLORS = { 'ЛЭ': '#2563eb', 'Отбеливание': '#f97316' };
+    const FALLBACK_COLORS = ['#2563eb', '#f97316', '#10b981', '#a855f7'];
+    const colorForLabel = (label, idx) => SERVICE_COLORS[label] || FALLBACK_COLORS[idx % FALLBACK_COLORS.length];
+
+    const money = n => '$' + (n || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    const num = n => (n || 0).toLocaleString('ru-RU');
+    const pct = n => (n || 0).toFixed(2) + '%';
+
+    const parseNum = v => {
+        if (!v) return 0;
+        let s = String(v).replace(/[^\d,.-]/g, '').replace(',', '.');
+        let f = parseFloat(s);
+        return isNaN(f) ? 0 : f;
+    };
+
+    async function doLogin() {
+        const code = document.getElementById('passInput').value.trim();
+        if (!code) return;
+
+        const btn = document.getElementById('loginBtn');
+        const errEl = document.getElementById('loginError');
+        btn.textContent = 'ПРОВЕРКА…';
+        btn.disabled = true;
+
+        try {
+            const res = await fetch(API + '/metrics', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code })
+            });
+
+            if (res.status === 401) {
+                errEl.style.opacity = '1';
+                setTimeout(() => errEl.style.opacity = '0', 2000);
+                btn.textContent = 'ВОЙТИ';
+                btn.disabled = false;
+                return;
+            }
+
+            const data = await res.json();
+            sessionCode = code;
+            allData = data.filter(item => item.data);
+            enter();
+        } catch (e) {
+            errEl.textContent = 'ОШИБКА СОЕДИНЕНИЯ';
+            errEl.style.opacity = '1';
+            setTimeout(() => { errEl.style.opacity = '0'; errEl.textContent = 'НЕВЕРНЫЙ КОД'; }, 2000);
+            btn.textContent = 'ВОЙТИ';
+            btn.disabled = false;
+        }
+    }
+
+    document.getElementById('loginBtn').onclick = doLogin;
+    document.getElementById('passInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+    function enter() {
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('mainContent').classList.remove('blur-mode');
+
+        cachedMonthsByCity = {};
+        cachedLabelsByCity = {};
+        allData.forEach(cityObj => {
+            const months = {};
+            const labels = new Set();
+            (cityObj.data || []).forEach(row => {
+                if (!row[0] || !/^\d{4}-\d{2}-\d{2}$/.test(row[0])) return;  // skip header / empty rows (some sheets have no header)
+                const mKey = row[0].substring(0, 7);
+                if (!months[mKey]) months[mKey] = [];
+                months[mKey].push(row);
+                if (row[7]) labels.add(row[7]);
+            });
+            cachedMonthsByCity[cityObj.city] = months;
+            cachedLabelsByCity[cityObj.city] = Array.from(labels).sort();
+        });
+
+        renderCityList();
+        if (allData.length > 0) {
+            updateUIAfterSelection(allData[0].city);
+        }
+    }
+
+    document.getElementById('logoutBtn').onclick = () => location.reload();
+
+    function renderCityList() {
+        const container = document.getElementById('cityList');
+        container.innerHTML = allData.map((item, idx) => `
+            <label class="flex items-center gap-3 p-3 rounded-xl hover:bg-blue-50 cursor-pointer transition-all">
+                <input type="radio" name="city" value="${item.city}" ${idx===0?'checked':''} onchange="updateUIAfterSelection(this.value)">
+                <span class="text-sm font-bold text-slate-600">${item.city}</span>
+            </label>
+        `).join('');
+        if (allData[0]) updateMonthDropdown(allData[0].city);
+    }
+
+    window.updateMonthDropdown = function(cityName) {
+        const mSelect = document.getElementById('monthSelect');
+        const months = cachedMonthsByCity[cityName] || {};
+        const mKeys = Object.keys(months).sort().reverse();
+        mSelect.innerHTML = mKeys.map(k => {
+           const label = new Date(k + "-01").toLocaleString('ru-RU', {month:'long', year:'numeric'}).replace(' г.','');
+           return `<option value="${k}">${label}</option>`;
+        }).join('');
+        updateServiceDropdown(cityName);
+    };
+
+    function updateServiceDropdown(cityName) {
+        const block = document.getElementById('serviceFilterBlock');
+        const sSelect = document.getElementById('serviceSelect');
+        const labels = cachedLabelsByCity[cityName] || [];
+        if (labels.length < 2) {
+            block.classList.add('hidden');
+            sSelect.innerHTML = '<option value="all">Все</option>';
+            return;
+        }
+        block.classList.remove('hidden');
+        sSelect.innerHTML = '<option value="all">Все</option>' + labels.map(l => `<option value="${l}">${l}</option>`).join('');
+    }
+
+    // city / month / service change re-renders right away; the button stays for habit
+    document.getElementById('monthSelect').onchange = () => document.getElementById('apply').click();
+    document.getElementById('serviceSelect').onchange = () => document.getElementById('apply').click();
+    window.updateUIAfterSelection = (c) => updateUIAfterSelection(c);
+
+    document.getElementById('apply').onclick = () => {
+        const city = document.querySelector('input[name="city"]:checked').value;
+        const month = document.getElementById('monthSelect').value;
+        const service = document.getElementById('serviceSelect').value;
+        renderDashboard(city, month, service);
+    };
+
+    function updateUIAfterSelection(cityName) {
+        updateMonthDropdown(cityName);
+        const firstMonth = document.getElementById('monthSelect').value;
+        renderDashboard(cityName, firstMonth, 'all');
+    }
+
+    function renderDashboard(cityName, monthKey, serviceFilter) {
+        document.getElementById('cityName').textContent = cityName;
+        const allRows = (cachedMonthsByCity[cityName] || {})[monthKey] || [];
+        const allCityDates = Object.values(cachedMonthsByCity[cityName] || {}).flat().map(r => r[0]).filter(Boolean).sort();
+        const ld = allCityDates[allCityDates.length - 1];
+        document.getElementById('lastDay').textContent = ld ? ld.split('-').reverse().slice(0, 2).join('.') : '—';
+        const rows = (!serviceFilter || serviceFilter === 'all')
+            ? allRows
+            : allRows.filter(r => r[7] === serviceFilter);
+
+        const tbody = document.getElementById('tableBody');
+        let tL = 0, tS = 0, tI = 0, tC = 0;
+
+        tbody.innerHTML = rows.map(r => {
+            const l = parseNum(r[1]), cpl = parseNum(r[2]), sp = parseNum(r[3]), im = parseNum(r[4]), cl = parseNum(r[5]), ct = parseNum(r[6]);
+            tL += l; tS += sp; tI += im; tC += cl;
+            return `<tr class="hover:bg-slate-50 transition-colors">
+                <td class="px-6 py-4 font-bold text-slate-500">${r[0]}</td>
+                <td class="px-6 py-4 font-black text-slate-800">${num(l)}</td>
+                <td class="px-6 py-4 text-slate-500">${money(cpl)}</td>
+                <td class="px-6 py-4 text-slate-500">${money(sp)}</td>
+                <td class="px-6 py-4 text-slate-400">${num(im)}</td>
+                <td class="px-6 py-4 text-slate-400">${num(cl)}</td>
+                <td class="px-6 py-4 font-bold text-blue-600">${pct(ct)}</td>
+                <td class="px-6 py-4 text-slate-400">${r[7] || '—'}</td>
+            </tr>`;
+        }).join('');
+
+        const avgCtr = tI > 0 ? (tC / tI) * 100 : 0;
+        const avgCpl = tL > 0 ? (tS / tL) : 0;
+
+        document.getElementById('kpiLeads').textContent = num(tL);
+        document.getElementById('kpiSpend').textContent = money(tS);
+        document.getElementById('kpiCpl').textContent = money(avgCpl);
+        document.getElementById('kpiCtr').textContent = pct(avgCtr);
+
+        document.getElementById('tLeads').textContent = num(tL);
+        document.getElementById('tSpend').textContent = money(tS);
+        document.getElementById('tImpr').textContent = num(tI);
+        document.getElementById('tClicks').textContent = num(tC);
+        document.getElementById('tCtr').textContent = pct(avgCtr);
+        document.getElementById('tCpl').textContent = money(avgCpl);
+
+        renderChart(rows);
+    }
+
+    function renderChart(rows) {
+        const ctx = document.getElementById('lineChart').getContext('2d');
+        if (chart) chart.destroy();
+
+        const distinctLabels = Array.from(new Set(rows.map(r => r[7]).filter(Boolean))).sort();
+        const dates = Array.from(new Set(rows.map(r => r[0]))).sort();
+
+        let datasets;
+        if (distinctLabels.length > 1) {
+            datasets = distinctLabels.map((label, idx) => {
+                const byDate = {};
+                rows.filter(r => r[7] === label).forEach(r => { byDate[r[0]] = parseNum(r[1]); });
+                const color = colorForLabel(label, idx);
+                return {
+                    label,
+                    data: dates.map(d => byDate[d] || 0),
+                    borderColor: color,
+                    borderWidth: 4, tension: 0.4, fill: true,
+                    backgroundColor: color + '0d', pointRadius: 4, pointHoverRadius: 6
+                };
+            });
+        } else {
+            const byDate = {};
+            rows.forEach(r => { byDate[r[0]] = (byDate[r[0]] || 0) + parseNum(r[1]); });
+            datasets = [{
+                label: 'Лиды',
+                data: dates.map(d => byDate[d] || 0),
+                borderColor: '#2563eb',
+                borderWidth: 4, tension: 0.4, fill: true,
+                backgroundColor: 'rgba(37,99,235,0.05)', pointRadius: 4, pointHoverRadius: 6
+            }];
+        }
+
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: dates.map(d => d.split('-')[2]),
+                datasets
+            },
+            options: {
+                plugins: { legend: { display: distinctLabels.length > 1 } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+})();
+</script>
+</body>
+</html>
